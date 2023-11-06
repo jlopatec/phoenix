@@ -9,7 +9,7 @@ import traceback
 
 from llama_index import download_loader
 from sklearn.metrics import ndcg_score
-
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 import config
 import numpy as np
@@ -145,7 +145,8 @@ def load_documents(base_url, save_base, file_name):
 
 
 def chunk_documents(documents, chunk_size):
-    text_splitter = TokenTextSplitter(chunk_size=chunk_size, chunk_overlap=0)
+    #text_splitter = TokenTextSplitter(chunk_size=chunk_size, chunk_overlap=0)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=0)
     docs = text_splitter.split_documents(documents)
     return docs
 
@@ -220,6 +221,10 @@ def get_retrieval_df(current_retriever_vector_db_dir, llm, questions, documents,
 
     return df
 
+# Define a mapping function
+def map_values(status_list):
+    return [1 if status == 'relevant' else 0 for status in status_list]
+
 
 def df_evals(
     df,
@@ -233,17 +238,21 @@ def df_evals(
         template=qa_templ,
         model=model,
         rails=["correct", "incorrect"],
+        verbose=True
     )
     df["qa_evals"] = Q_and_A_classifications
-    df[formatted_evals_column] = run_relevance_eval(
-        dataframe=df,
-        query_column_name="question",
-        retrieved_documents_column_name="context",
+    
+    df['eval_results_raw']= run_relevance_eval(
+        dataframe= df.rename(columns={'question': 'query', 'context': 'reference'}),
+        query_column_name="query",
+        document_column_name="reference",
         template=RAG_RELEVANCY_PROMPT_TEMPLATE_STR,
         model=model,
-        output_map={"relevant": 1, "irrelevant": 0},
-        trace_data=False,
+        #output_map={"relevant": 1, "irrelevant": 0},
+        #trace_data=False,
     )
+    # Apply the mapping function to each row in the 'status' column
+    df[formatted_evals_column]  = df['eval_results_raw'].apply(map_values)
     return df
 
 
@@ -345,8 +354,8 @@ def run_experiments(
 
 
 def main():
-    openai.api_key = config.open_ai_key
-    os.environ["OPENAI_API_KEY"] = config.open_ai_key
+    #openai.api_key = config.open_ai_key
+    #os.environ["OPENAI_API_KEY"] = config.open_ai_key
     web_title = "arize"  # nickname for this website, used for saving purposes
     base_url = "https://docs.arize.com/arize"
     # Local files
