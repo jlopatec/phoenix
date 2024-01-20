@@ -145,7 +145,7 @@ def main():
 
     #tracer = Tracer(exporter=HttpExporter())
     #OpenAIInstrumentor(tracer).instrument()
-    llama_index.set_global_handler("arize_phoenix")
+    #llama_index.set_global_handler("arize_phoenix")
 
     # Run all of your LlamaIndex applications as usual and traces
     # will be collected and displayed in Phoenix.
@@ -168,7 +168,7 @@ def main():
 
     # QA template (using default)
     qa_template = templates.QA_PROMPT_TEMPLATE
-    # Uncomment below when testing to limit number of questions
+    # Uncomment below when testing specific questions 
     #questions = [questions[6]]
     #answers = [answers[6]]
     #questions = questions[:6]
