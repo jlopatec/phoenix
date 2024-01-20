@@ -10,10 +10,8 @@ import time
 from typing import Dict, List
 
 import cohere
-import llama_index
 import numpy as np
 import pandas as pd
-import phoenix as px
 import phoenix.experimental.evals.templates.default_templates as templates
 import requests
 from bs4 import BeautifulSoup
@@ -25,23 +23,20 @@ from llama_index import (
     download_loader,
     load_index_from_storage,
 )
+import llama_index
 from llama_index.callbacks import CallbackManager, LlamaDebugHandler
+from llama_index.postprocessor.cohere_rerank import CohereRerank
 from llama_index.indices.query.query_transform import HyDEQueryTransform
 from llama_index.indices.query.query_transform.base import StepDecomposeQueryTransform
 from llama_index.llms import OpenAI
 from llama_index.node_parser import SimpleNodeParser
-from llama_index.postprocessor.cohere_rerank import CohereRerank
 from llama_index.query_engine.multistep_query_engine import MultiStepQueryEngine
 from llama_index.query_engine.transform_query_engine import TransformQueryEngine
-from phoenix.experimental.evals import (
-    OpenAIModel,
-    llm_classify,
-    run_relevance_eval,
-)
+from llama_index.embeddings import OpenAIEmbedding
+from phoenix.experimental.evals import NOT_PARSABLE, OpenAIModel, llm_classify, run_relevance_eval
 from phoenix.experimental.evals.functions.processing import concatenate_and_truncate_chunks
 from phoenix.experimental.evals.models import BaseEvalModel
-
-# from phoenix.experimental.evals.templates import NOT_PARSABLE
+#from phoenix.experimental.evals.templates import NOT_PARSABLE
 from plotresults import (
     plot_latency_graphs,
     plot_mean_average_precision_graphs,
@@ -52,10 +47,162 @@ from plotresults import (
 )
 from sklearn.metrics import ndcg_score
 
+import phoenix as px
+from phoenix.experimental.evals import (
+    OpenAIModel,
+    compute_precisions_at_k,
+    run_relevance_eval,
+)
+
+from llama_index import (
+    ServiceContext,
+    StorageContext,
+    load_index_from_storage,
+    set_global_handler,
+)
+
+from phoenix.experimental.evals import (
+    HUMAN_VS_AI_PROMPT_RAILS_MAP,
+    HUMAN_VS_AI_PROMPT_TEMPLATE
+)
 LOGGING_LEVEL = 20  # INFO
 logging.basicConfig(level=LOGGING_LEVEL)
 logger = logging.getLogger("evals")
 
+#os.environ["PHOENIX_COLLECTOR_ENDPOINT"] = "http://127.0.0.1/"
+from phoenix.trace.tracer import Tracer
+from phoenix.trace.exporter import HttpExporter
+from phoenix.trace.openai.instrumentor import OpenAIInstrumentor
+
+
+#tracer = Tracer(exporter=HttpExporter())
+#OpenAIInstrumentor(tracer).instrument()
+
+def main():
+    check_keys()
+
+    # if loading from scratch, change these below
+    web_title = "arize"  # nickname for this website, used for saving purposes
+    base_url = "https://docs.arize.com/arize"
+    has_answer = True  # True if the website has answers to the questions
+    # Local files
+    file_name = "raw_documents.pkl"
+    save_base = "./experiment_data/"
+    if not os.path.exists(save_base):
+        os.makedirs(save_base)
+    run_name = datetime.datetime.now().strftime("%Y%m%d_%H%M")
+    save_dir = os.path.join(save_base, run_name)
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    # Read strings from CSV
+    questions_file = pd.read_csv(
+        "https://storage.googleapis.com/arize-assets/fixtures/Embeddings/GENERATIVE/human_vs_ai_eval.csv",
+        #header=None,
+    )#[0].to_list()
+    index_no_na = questions_file["question"].notna()
+    questions = questions_file[index_no_na]['question'].to_list()
+    if has_answer:
+        answers = questions_file[index_no_na]['correct_answer'].to_list()
+    else:   
+        answers = None
+
+
+    raw_docs_filepath = os.path.join(save_base, file_name)
+    # two options here, either get the documents from scratch or load one from disk
+    if not os.path.exists(raw_docs_filepath):
+        logger.info(f"'{raw_docs_filepath}' does not exists.")
+        urls = get_urls(base_url)  # you need to - pip install lxml
+        logger.info(f"LOADED {len(urls)} URLS")
+
+        logger.info("GRABBING DOCUMENTS")
+        #BeautifulSoupWebReader = download_loader("BeautifulSoupWebReader")
+        UnstructuredURLLoader = download_loader("UnstructuredURLLoader")
+        logger.info("LOADING DOCUMENTS FROM URLS")
+        # You need to 'pip install lxml'
+        loader = UnstructuredURLLoader(urls=urls)
+        documents = loader.load_data()  # may take some time
+        #loader = BeautifulSoupWebReader()
+        #documents = loader.load_data(urls=urls)  # may take some time
+        with open(raw_docs_filepath, "wb") as file:
+            pickle.dump(documents, file)
+        logger.info("Documents saved to raw_documents.pkl")
+    else:
+        logger.info("LOADING DOCUMENTS FROM FILE")
+        logger.info("Opening raw_documents.pkl")
+        with open(raw_docs_filepath, "rb") as file:
+            documents = pickle.load(file)
+    #import nest_asyncio
+
+    #nest_asyncio.apply()
+    
+        # The App is initially empty, but as you proceed with the steps below,
+    # traces will appear automatically as your LlamaIndex application runs.
+    from phoenix.trace.tracer import Tracer
+    from phoenix.trace.openai.instrumentor import OpenAIInstrumentor
+    from phoenix.trace.exporter import HttpExporter
+    from phoenix.trace.openai import OpenAIInstrumentor
+
+    #tracer = Tracer(exporter=HttpExporter())
+    #OpenAIInstrumentor(tracer).instrument()
+    llama_index.set_global_handler("arize_phoenix")
+
+    # Run all of your LlamaIndex applications as usual and traces
+    # will be collected and displayed in Phoenix.
+    chunk_sizes = [
+        #100,
+        #300,
+         700,
+        # 1000,
+        # 2000,
+    ]  # change this, perhaps experiment from 500 to 3000 in increments of 500
+
+    k = [6]  # , 6, 10]
+    # k = [10]  # num documents to retrieve
+
+    # transformations = ["original", "original_rerank","hyde", "hyde_rerank"]
+    transformations = ["original"]
+
+    llama_index_model = "gpt-4-1106-preview"
+    eval_model = OpenAIModel(model_name="gpt-4-1106-preview", temperature=0.0)
+
+    # QA template (using default)
+    qa_template = templates.QA_PROMPT_TEMPLATE
+    # Uncomment below when testing to limit number of questions
+    #questions = [questions[6]]
+    #answers = [answers[6]]
+    #questions = questions[:6]
+    answers = answers[:6]
+    all_data = run_experiments(
+        documents=documents,
+        queries=questions,
+        chunk_sizes=chunk_sizes,
+        query_transformations=transformations,
+        k_values=k,
+        web_title=web_title,
+        save_dir=save_dir,
+        llama_index_model=llama_index_model,
+        eval_model=eval_model,
+        template=qa_template,
+        answers=answers,
+    )
+
+    all_data_filepath = os.path.join(save_dir, f"{web_title}_all_data.pkl")
+    with open(all_data_filepath, "wb") as f:
+        pickle.dump(all_data, f)
+
+    plot_graphs(
+        all_data=all_data,
+        save_dir=os.path.join(save_dir, "results_zero_removed"),
+        show=False,
+        remove_zero=True,
+    )
+    plot_graphs(
+        all_data=all_data,
+        save_dir=os.path.join(save_dir, "results_zero_not_removed"),
+        show=False,
+        remove_zero=False,
+    )
 
 # URL and Website download utilities
 def get_urls(base_url: str) -> List[str]:
@@ -87,16 +234,22 @@ def plot_graphs(all_data: Dict, save_dir: str = "./", show: bool = True, remove_
 
 
 # LamaIndex performance optimizaitons
-def get_transformation_query_engine(index, name, k, llama_index_model):
-    if name == "original":
+def get_transformation_query_engine(storage_context, index, name, k, llama_index_model):
+    if name == "original": #Dat Note: this is what we are using
         # query cosine similarity to nodes engine
-        llama_debug = LlamaDebugHandler(print_trace_on_end=True)
-        callback_manager = CallbackManager([llama_debug])
+        #llama_debug = LlamaDebugHandler(print_trace_on_end=True)
+        #callback_manager = CallbackManager([llama_debug])
         service_context = ServiceContext.from_defaults(
             llm=OpenAI(temperature=float(0.6), model=llama_index_model),
-            callback_manager=callback_manager,
+            embed_model=OpenAIEmbedding(model="text-embedding-ada-002"),
+         #   callback_manager=callback_manager,
         )
-        query_engine = index.as_query_engine(
+
+        index_2 = load_index_from_storage(
+            storage_context,
+            service_context=service_context,
+        )
+        query_engine = index_2.as_query_engine(
             similarity_top_k=k,
             response_mode="compact",
             service_context=service_context,
@@ -178,6 +331,7 @@ def run_experiments(
     llama_index_model,
     eval_model: BaseEvalModel,
     template: str,
+    answers=None,
 ):
     logger.info(f"LAMAINDEX MODEL : {llama_index_model}")
     all_data = {}
@@ -194,17 +348,18 @@ def run_experiments(
         else:
             logger.info("BUILDING INDEX...")
             node_parser = SimpleNodeParser.from_defaults(
-                chunk_size=chunk_size, chunk_overlap=0
+                chunk_size=chunk_size, chunk_overlap=100
             )  # you can also experiment with the chunk overlap too
             nodes = node_parser.get_nodes_from_documents(documents)
             index = VectorStoreIndex(nodes, show_progress=True)
             index.storage_context.persist(persist_dir)
+            storage_context = index.storage_context
 
         engines = {}
         for k in k_values:  # <-- This is where we add the loop for k.
             # create different query transformation engines
             for name in query_transformations:
-                this_engine = get_transformation_query_engine(index, name, k, llama_index_model)
+                this_engine = get_transformation_query_engine(storage_context, index, name, k, llama_index_model)
                 engines[name] = this_engine
 
             query_transformation_data = {name: [] for name in engines}
@@ -224,7 +379,7 @@ def run_experiments(
                     logger.info(f"K : {k}")
 
                     time_start = time.time()
-                    response = engine.query(query)
+                    response = engine.query(query) #Main Search of query
                     time_end = time.time()
                     response_latency = time_end - time_start
 
@@ -232,7 +387,7 @@ def run_experiments(
                     logger.info(f"LATENCY: {response_latency:.2f}")
                     contexts = [
                         source_node.node.get_content() for source_node in response.source_nodes
-                    ]
+                    ] # Dat Note: this is where we get the contexts and text
 
                     scores = [source_node.score for source_node in response.source_nodes]
 
@@ -271,11 +426,13 @@ def run_experiments(
                     df = pd.DataFrame(data, columns=columns)
                 logger.info("RUNNING EVALS")
                 time_start = time.time()
+                #nodes_df = pd.DataFrame({"text": [node.text for node in nodes]})
                 df = df_evals(
                     df=df,
                     model=eval_model,
                     formatted_evals_column="retrieval_evals",
                     template=template,
+                    answers=answers,
                 )
                 time_end = time.time()
                 eval_latency = time_end - time_start
@@ -283,6 +440,7 @@ def run_experiments(
                 # Calculate MRR/NDCG on top of Eval metrics
                 df = calculate_metrics(df, k, formatted_evals_column="retrieval_evals")
                 all_data[chunk_size][name][k] = df
+                df.to_csv(str(chunk_size) + "_" + name + "_" + str(k) + ".csv")
 
             tmp_save_dir = save_dir + "tmp_" + str(chunk_size) + "/"
             # Save tmp plots
@@ -300,25 +458,27 @@ def df_evals(
     model: BaseEvalModel,
     formatted_evals_column: str,
     template: str,
+    answers=None,
 ):
     # Then use the function in a single call
     df["context"] = df["retrieved_context_list"].apply(
         lambda chunks: concatenate_and_truncate_chunks(chunks=chunks, model=model, token_buffer=700)
     )
 
-    df = df.rename(columns={"query": "question", "response": "sampled_answer"})
+    df = df.rename(columns={"query": "input", "response": "output", "context": "reference"})
     # Q&A Eval: Did the LLM get the answer right? Checking the LLM
     Q_and_A_classifications = llm_classify(
         dataframe=df,
         template=template,
         model=model,
         rails=["correct", "incorrect"],
+        concurrency=1
     ).iloc[:, 0]
     df["qa_evals"] = Q_and_A_classifications
     # Retreival Eval: Did I have the relevant data to even answer the question?
     # Checking retrieval system
-
-    df = df.rename(columns={"question": "query", "retrieved_context_list": "reference"})
+    df = df.rename(columns={"reference": "context"})
+    df = df.rename(columns={"retrieved_context_list": "reference"})
     # query_column_name needs to also adjust the template to uncomment the
     # 2 fields in the function call below and delete the line above
     df[formatted_evals_column] = run_relevance_eval(
@@ -326,8 +486,8 @@ def df_evals(
         model=model,
         template=templates.RAG_RELEVANCY_PROMPT_TEMPLATE,
         rails=list(templates.RAG_RELEVANCY_PROMPT_RAILS_MAP.values()),
-        query_column_name="query",
-        # document_column_name="retrieved_context_list",
+        query_column_name="input",
+        #document_column_name="retrieved_context_list",
     )
 
     # We want 0, 1 values for the metrics
@@ -335,6 +495,21 @@ def df_evals(
     df[formatted_evals_column] = df[formatted_evals_column].apply(
         lambda values: [value_map.get(value) for value in values]
     )
+    if answers:
+        df_human_ai = pd.DataFrame()
+        df_human_ai["question"] = df["input"]
+        df_human_ai["ai_generated_answer"] = df["output"]
+        df_human_ai["correct_answer"] = answers
+        ai_vs_human = llm_classify(
+            dataframe=df_human_ai,
+            template=HUMAN_VS_AI_PROMPT_TEMPLATE,
+            model=model,
+            rails=list(HUMAN_VS_AI_PROMPT_RAILS_MAP.values()),
+            use_function_calling_if_available=False,
+            provide_explanation=True,
+        )
+        df['ai_human_eval'] = ai_vs_human['label']
+        df['ai_human_eval_explanation'] = ai_vs_human['explanation']
     return df
 
 
@@ -397,109 +572,7 @@ def check_keys() -> None:
         )
 
 
-def main():
-    check_keys()
 
-    # if loading from scratch, change these below
-    web_title = "arize"  # nickname for this website, used for saving purposes
-    base_url = "https://docs.arize.com/arize"
-    # Local files
-    file_name = "raw_documents.pkl"
-    save_base = "./experiment_data/"
-    if not os.path.exists(save_base):
-        os.makedirs(save_base)
-    run_name = datetime.datetime.now().strftime("%Y%m%d_%H%M")
-    save_dir = os.path.join(save_base, run_name)
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-
-    # Read strings from CSV
-    questions = pd.read_csv(
-        "https://storage.googleapis.com/arize-assets/fixtures/Embeddings/GENERATIVE/constants.csv",
-        header=None,
-    )[0].to_list()
-
-    raw_docs_filepath = os.path.join(save_base, file_name)
-    # two options here, either get the documents from scratch or load one from disk
-    if not os.path.exists(raw_docs_filepath):
-        logger.info(f"'{raw_docs_filepath}' does not exists.")
-        urls = get_urls(base_url)  # you need to - pip install lxml
-        logger.info(f"LOADED {len(urls)} URLS")
-
-        logger.info("GRABBING DOCUMENTS")
-        BeautifulSoupWebReader = download_loader("BeautifulSoupWebReader")
-        logger.info("LOADING DOCUMENTS FROM URLS")
-        # You need to 'pip install lxml'
-        loader = BeautifulSoupWebReader()
-        documents = loader.load_data(urls=urls)  # may take some time
-        with open(raw_docs_filepath, "wb") as file:
-            pickle.dump(documents, file)
-        logger.info("Documents saved to raw_documents.pkl")
-    else:
-        logger.info("LOADING DOCUMENTS FROM FILE")
-        logger.info("Opening raw_documents.pkl")
-        with open(raw_docs_filepath, "rb") as file:
-            documents = pickle.load(file)
-
-    # Look for a URL in the output to open the App in a browser.
-    px.launch_app()
-    # The App is initially empty, but as you proceed with the steps below,
-    # traces will appear automatically as your LlamaIndex application runs.
-
-    llama_index.set_global_handler("arize_phoenix")
-
-    # Run all of your LlamaIndex applications as usual and traces
-    # will be collected and displayed in Phoenix.
-    chunk_sizes = [
-        # 100,
-        # 300,
-        500,
-        # 1000,
-        # 2000,
-    ]  # change this, perhaps experiment from 500 to 3000 in increments of 500
-
-    k = [4]  # , 6, 10]
-    # k = [10]  # num documents to retrieve
-
-    # transformations = ["original", "original_rerank","hyde", "hyde_rerank"]
-    transformations = ["original"]
-
-    llama_index_model = "gpt-4"
-    eval_model = OpenAIModel(model_name="gpt-4", temperature=0.0)
-
-    # QA template (using default)
-    qa_template = templates.QA_PROMPT_TEMPLATE
-    # Uncomment below when testing to limit number of questions
-    # questions = [questions[1]]
-    all_data = run_experiments(
-        documents=documents,
-        queries=questions,
-        chunk_sizes=chunk_sizes,
-        query_transformations=transformations,
-        k_values=k,
-        web_title=web_title,
-        save_dir=save_dir,
-        llama_index_model=llama_index_model,
-        eval_model=eval_model,
-        template=qa_template,
-    )
-
-    all_data_filepath = os.path.join(save_dir, f"{web_title}_all_data.pkl")
-    with open(all_data_filepath, "wb") as f:
-        pickle.dump(all_data, f)
-
-    plot_graphs(
-        all_data=all_data,
-        save_dir=os.path.join(save_dir, "results_zero_removed"),
-        show=False,
-        remove_zero=True,
-    )
-    plot_graphs(
-        all_data=all_data,
-        save_dir=os.path.join(save_dir, "results_zero_not_removed"),
-        show=False,
-        remove_zero=False,
-    )
 
 
 if __name__ == "__main__":
