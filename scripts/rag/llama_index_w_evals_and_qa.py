@@ -164,15 +164,15 @@ def main():
     transformations = ["original"]
 
     llama_index_model = "gpt-4-1106-preview"
-    eval_model = OpenAIModel(model_name="gpt-4-1106-preview", temperature=0.0)
+    eval_model = OpenAIModel(model_name="gpt-4, temperature=0.0)
 
     # QA template (using default)
     qa_template = templates.QA_PROMPT_TEMPLATE
     # Uncomment below when testing specific questions 
     #questions = [questions[6]]
-    #answers = [answers[6]]
-    #questions = questions[:6]
-    #answers = answers[:6]
+    answers = [answers[6]]
+    questions = questions[:6]
+    answers = answers[:6]
     all_data = run_experiments(
         documents=documents,
         queries=questions,
