@@ -172,7 +172,7 @@ def main():
     #questions = [questions[6]]
     #answers = [answers[6]]
     #questions = questions[:6]
-    answers = answers[:6]
+    #answers = answers[:6]
     all_data = run_experiments(
         documents=documents,
         queries=questions,
