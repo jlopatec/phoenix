@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.8.0](https://github.com/jlopatec/phoenix/compare/arize-phoenix-evals-v0.7.0...arize-phoenix-evals-v0.8.0) (2024-04-13)
+
+
+### Features
+
+* Add `response_format` argument to `MistralAIModel` ([#2660](https://github.com/jlopatec/phoenix/issues/2660)) ([7da51af](https://github.com/jlopatec/phoenix/commit/7da51afc77984925cd59d7d909142141530684cc))
+* add phoenix-evals support for python 3.12 ([#2554](https://github.com/jlopatec/phoenix/issues/2554)) ([efb6a76](https://github.com/jlopatec/phoenix/commit/efb6a764a2aaecfff271b2cd7b7569771989a6a1))
+* Add SQL and Code Functionality Eval Templates ([#2861](https://github.com/jlopatec/phoenix/issues/2861)) ([c7d776a](https://github.com/jlopatec/phoenix/commit/c7d776a23e1843cc1bb5c74059496615700a3396))
+* **evals:** Add Mistral as an eval model ([#2640](https://github.com/jlopatec/phoenix/issues/2640)) ([c13ab6b](https://github.com/jlopatec/phoenix/commit/c13ab6bf644ec285c37e92cc6a7b114a309cec52))
+* Removes token processing module from `phoenix.evals` ([#2421](https://github.com/jlopatec/phoenix/issues/2421)) ([fbd4961](https://github.com/jlopatec/phoenix/commit/fbd496163d6cf46b3299da4ac7962b19da054bd8))
+* Update `AnthropicModel` to use `messages` API ([#2489](https://github.com/jlopatec/phoenix/issues/2489)) ([5aa3842](https://github.com/jlopatec/phoenix/commit/5aa3842d3e3d8a1fe21fb62c594032474899fb81))
+* update bedrock.py to use messages API for claude ([#2636](https://github.com/jlopatec/phoenix/issues/2636)) ([3d7d91a](https://github.com/jlopatec/phoenix/commit/3d7d91ac6f399ceb40771461cd1fc7bfe60ff04f))
+
+
+### Bug Fixes
+
+* `llm_generate` now preserves input index when constructing the output ([#2441](https://github.com/jlopatec/phoenix/issues/2441)) ([ee36987](https://github.com/jlopatec/phoenix/commit/ee369874649ac36fadcce3322cf87cf22d04aed4))
+* **evals:** reference link template export ([#2393](https://github.com/jlopatec/phoenix/issues/2393)) ([d9e21b7](https://github.com/jlopatec/phoenix/commit/d9e21b7cb6f4c9cc9c863623696f3987f96dd174))
+* export reference link templates ([#2390](https://github.com/jlopatec/phoenix/issues/2390)) ([d5e4121](https://github.com/jlopatec/phoenix/commit/d5e41213e897bfb64e121a72b85c614b29e1358c))
+* pass verbose to evaluators ([#2597](https://github.com/jlopatec/phoenix/issues/2597)) ([9467e1d](https://github.com/jlopatec/phoenix/commit/9467e1deabe58c0079ad8bdb9dfc972ee2ae5c0b))
+* Properly define `BedrockModel` ([#2425](https://github.com/jlopatec/phoenix/issues/2425)) ([81a720c](https://github.com/jlopatec/phoenix/commit/81a720c8264f80fc37fcfe76c1c982014e9f12b3))
+* remove run_relevance_evals and fix import issues ([#2375](https://github.com/jlopatec/phoenix/issues/2375)) ([9a97e62](https://github.com/jlopatec/phoenix/commit/9a97e6251cddf4ca7aa03ba71d4831cb0de4a165))
+* source distribution build ([#2407](https://github.com/jlopatec/phoenix/issues/2407)) ([1e67d7e](https://github.com/jlopatec/phoenix/commit/1e67d7e4eb037f85b1e33e59b42014fe3daa876d))
+* switch license format  in toml ([5c6f345](https://github.com/jlopatec/phoenix/commit/5c6f345691dcab3d460823329ce31b9060bab02c))
+
+
+### Documentation
+
+* Create an outline for how-to traces (GITBOOK-552) ([6002e05](https://github.com/jlopatec/phoenix/commit/6002e05fae00673736e63cffd6600bb3c91446ab))
+* **evals:** add README ([#2363](https://github.com/jlopatec/phoenix/issues/2363)) ([47842da](https://github.com/jlopatec/phoenix/commit/47842da560f004944852ea1071edf30eb3993ac8))
+* Update user guide image (GITBOOK-556) ([ba7040f](https://github.com/jlopatec/phoenix/commit/ba7040f6b0d73bdc53aabcdb16ea10aa4cd0e5a2))
+
 ## [0.7.0](https://github.com/Arize-ai/phoenix/compare/arize-phoenix-evals-v0.6.1...arize-phoenix-evals-v0.7.0) (2024-04-12)
 
 
