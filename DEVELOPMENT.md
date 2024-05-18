@@ -32,17 +32,25 @@ Create a new virtual environment with a Phoenix-compatible Python version. For e
 conda create --name phoenix python=3.8
 ```
 
-Install web build dependancies
-[NPM via nvm](https://github.com/nvm-sh/nvm) - LTS should work in most cases
-Make sure you have npm (node package manager) available on your terminal as well
+Install web build dependencies
+[nodejs via nvm](https://github.com/nvm-sh/nvm) - LTS should work in most cases
+[pnpm](https://pnpm.io/) - `npm install -g pnpm`
+Make sure you have pnpm (node package manager) available on your terminal as well
 
-Install `phoenix` in development mode (using the `-e` flag) and with development dependencies (using the `[dev]` extra) by running
+Install `phoenix` in development mode (using the `-e` flag) and with development dependencies (using the `[dev,test]` extra) by running
 
 ```bash
-pip install -e ".[dev,experimental]"
+pip install -e ".[dev,test]"
 ```
 
 from the repository root.
+
+You will also need to build the web app. Change directory to `app` and run:
+
+```bash
+pnpm install
+pnpm run build
+```
 
 If you are working on our LLM orchestration framework integrations, you may also wish to install LlamaIndex or LangChain from source. To install LlamaIndex from source,
 
@@ -61,6 +69,24 @@ To install LangChain from source,
 -   Run `pip install -e .` from `libs/langchain`.
 
 ## Testing and Linting
+
+Phoenix is backed with either a `sqlite` or `postgresql` database. By default, tests that involve
+persistence in some way run against both backends. Ensure that `postgresql` is installed on your
+system.
+
+```bash
+brew install postgresql
+```
+
+Ensure your environment is set up so that `pg_config` points to the correct binary.
+
+```bash
+pg_config --bindir
+```
+
+This command should point to the `homebrew` install of `postgresql`, if it doesn't, try creating
+a fresh Python environment or modifying your `PATH`.
+
 
 Phoenix uses `hatch` as the project management tool to lint and test source code and to build the package. After creating and activating your `phoenix` virtual environment, view your `hatch` environments, dependencies and, scripts defined in `pyproject.toml` with
 
@@ -86,10 +112,17 @@ To format your code, run
 hatch run style:fix
 ```
 
-To run tests with coverage, run
+To run tests
 
 ```bash
-hatch run test:coverage
+hatch run tests
+```
+
+By default, database tests only run against `sqlite`, in order to run database tests against
+a `postgresql` database as well, use the `--run-postgres` flag
+
+```bash
+hatch run tests --run-postgres
 ```
 
 The following resources are helpful to learn more about the capabilities of `hatch` and to familiarize yourself with the CLI.
@@ -109,7 +142,15 @@ Once installed, the pre-commit hooks configured in `.pre-commit-config.yaml` wil
 
 ## Building the Package
 
-To build Phoenix, run
+To build Phoenix, you must build the `app` and the python package.
+
+To build the `app`, navigate to the `app` directory and run
+
+```bash
+pnpm run build
+```
+
+Then, from the root directory of the repo, run
 
 ```bash
 hatch build

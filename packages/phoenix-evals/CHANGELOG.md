@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.9.0](https://github.com/Arize-ai/phoenix/compare/arize-phoenix-evals-v0.8.2...arize-phoenix-evals-v0.9.0) (2024-05-17)
+
+
+### Features
+
+* Added support for default_headers for azure_openai. ([#3211](https://github.com/Arize-ai/phoenix/issues/3211)) ([2d48192](https://github.com/Arize-ai/phoenix/commit/2d48192d57a1b97e4b08efc30f5c689423667c93))
+
+## [0.8.2](https://github.com/Arize-ai/phoenix/compare/arize-phoenix-evals-v0.8.1...arize-phoenix-evals-v0.8.2) (2024-05-14)
+
+
+### Bug Fixes
+
+* evaluators no longer have incorrect type hints ([#3195](https://github.com/Arize-ai/phoenix/issues/3195)) ([7d57e2e](https://github.com/Arize-ai/phoenix/commit/7d57e2e760a98095c57b45b3e39e2d009972faaf))
+
+## [0.8.1](https://github.com/Arize-ai/phoenix/compare/arize-phoenix-evals-v0.8.0...arize-phoenix-evals-v0.8.1) (2024-05-03)
+
+
+### Bug Fixes
+
+* **evals:** incorrect wording in hallucinations ([#3085](https://github.com/Arize-ai/phoenix/issues/3085)) ([7aa0292](https://github.com/Arize-ai/phoenix/commit/7aa029239c2c36b677070e270f7127f6bf6cff5e))
+
+## [0.8.0](https://github.com/Arize-ai/phoenix/compare/arize-phoenix-evals-v0.7.0...arize-phoenix-evals-v0.8.0) (2024-04-22)
+
+
+### Features
+
+* Add user frustration eval ([#2928](https://github.com/Arize-ai/phoenix/issues/2928)) ([406938b](https://github.com/Arize-ai/phoenix/commit/406938b1f19ee6efb7cec630772d9d8940c0953f))
+
 ## [0.7.0](https://github.com/Arize-ai/phoenix/compare/arize-phoenix-evals-v0.6.1...arize-phoenix-evals-v0.7.0) (2024-04-12)
 
 
