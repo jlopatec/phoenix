@@ -32,3 +32,29 @@ export function isJSONString({
 export function isJSONObjectString(str: string) {
   return isJSONString({ str, excludeArray: true, excludePrimitives: true });
 }
+
+/**
+ * Pretty prints a JSON string, falling back to the raw value if it is not valid JSON.
+ */
+export function formatJSONString(str: unknown): string {
+  if (typeof str !== "string") {
+    return String(str ?? "");
+  }
+  try {
+    return JSON.stringify(JSON.parse(str), null, 2);
+  } catch (e) {
+    return str;
+  }
+}
+
+/**
+ * Parses a JSON object string, returning null if it is not a valid JSON object.
+ */
+export function safelyParseJSONObject(
+  str: unknown
+): Record<string, unknown> | null {
+  if (typeof str !== "string" || !isJSONObjectString(str)) {
+    return null;
+  }
+  return JSON.parse(str);
+}

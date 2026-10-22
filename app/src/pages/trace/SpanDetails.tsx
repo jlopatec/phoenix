@@ -76,8 +76,13 @@ import {
   AttributeReranker,
   AttributeRetrieval,
   AttributeTool,
+  getAttributeMessages,
 } from "@phoenix/openInference/tracing/types";
 import { assertUnreachable, isStringArray } from "@phoenix/typeUtils";
+import {
+  formatJSONString,
+  safelyParseJSONObject,
+} from "@phoenix/utils/jsonUtils";
 import { formatFloat, numberFormatter } from "@phoenix/utils/numberFormatUtils";
 
 import { RetrievalEvaluationLabel } from "../project/RetrievalEvaluationLabel";
@@ -491,9 +496,9 @@ function LLMSpanInfo(props: { span: Span; spanAttributes: AttributeObject }) {
     if (llmAttributes == null) {
       return [];
     }
-    return (llmAttributes[LLMAttributePostfixes.input_messages]
-      ?.map((obj) => obj[SemanticAttributePrefixes.message])
-      .filter(Boolean) || []) as AttributeMessage[];
+    return getAttributeMessages(
+      llmAttributes[LLMAttributePostfixes.input_messages]
+    );
   }, [llmAttributes]);
 
   const llmTools = useMemo<AttributeLLMToolDefinition[]>(() => {
@@ -523,9 +528,9 @@ function LLMSpanInfo(props: { span: Span; spanAttributes: AttributeObject }) {
     if (llmAttributes == null) {
       return [];
     }
-    return (llmAttributes[LLMAttributePostfixes.output_messages]
-      ?.map((obj) => obj[SemanticAttributePrefixes.message])
-      .filter(Boolean) || []) as AttributeMessage[];
+    return getAttributeMessages(
+      llmAttributes[LLMAttributePostfixes.output_messages]
+    );
   }, [llmAttributes]);
 
   const prompts = useMemo<string[]>(() => {
@@ -579,7 +584,8 @@ function LLMSpanInfo(props: { span: Span; spanAttributes: AttributeObject }) {
   const hasOutputMessages = outputMessages.length > 0;
   const hasPrompts = prompts.length > 0;
   const hasInvocationParams =
-    Object.keys(JSON.parse(invocation_parameters_str)).length > 0;
+    Object.keys(safelyParseJSONObject(invocation_parameters_str) ?? {}).length >
+    0;
   const hasPromptTemplateObject = promptTemplateObject != null;
 
   return (
@@ -1334,12 +1340,7 @@ function LLMMessage({ message }: { message: AttributeMessage }) {
                     `}
                   >
                     {toolCall?.function?.name as string}(
-                    {JSON.stringify(
-                      JSON.parse(toolCall?.function?.arguments as string),
-                      null,
-                      2
-                    )}
-                    )
+                    {formatJSONString(toolCall?.function?.arguments)})
                   </pre>
                 );
               })
@@ -1353,14 +1354,8 @@ function LLMMessage({ message }: { message: AttributeMessage }) {
               `}
             >
               {message[MessageAttributePostfixes.function_call_name] as string}(
-              {JSON.stringify(
-                JSON.parse(
-                  message[
-                    MessageAttributePostfixes.function_call_arguments_json
-                  ] as string
-                ),
-                null,
-                2
+              {formatJSONString(
+                message[MessageAttributePostfixes.function_call_arguments_json]
               )}
               )
             </pre>

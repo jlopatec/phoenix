@@ -100,8 +100,8 @@ export type AttributeReranker = {
 export type AttributeLlm = {
   [LLMAttributePostfixes.model_name]?: string;
   [LLMAttributePostfixes.token_count]?: number;
-  [LLMAttributePostfixes.input_messages]?: AttributeMessages;
-  [LLMAttributePostfixes.output_messages]?: AttributeMessages;
+  [LLMAttributePostfixes.input_messages]?: AttributeMessages | unknown;
+  [LLMAttributePostfixes.output_messages]?: AttributeMessages | unknown;
   [LLMAttributePostfixes.invocation_parameters]?: string;
   [LLMAttributePostfixes.prompts]?: string[];
   [LLMAttributePostfixes.prompt_template]?: AttributePromptTemplate;
@@ -112,3 +112,31 @@ export type AttributePromptTemplate = {
   [LLMPromptTemplateAttributePostfixes.template]: string;
   [LLMPromptTemplateAttributePostfixes.variables]: Record<string, string>;
 };
+
+/**
+ * Extracts well-formed messages from a possibly malformed messages attribute.
+ * Spans may be ingested with arbitrary shapes, so anything unexpected is dropped.
+ */
+export function getAttributeMessages(messages: unknown): AttributeMessage[] {
+  if (!Array.isArray(messages)) {
+    return [];
+  }
+  return messages.reduce<AttributeMessage[]>((acc, obj) => {
+    const message =
+      typeof obj === "object" && obj !== null
+        ? obj[SemanticAttributePrefixes.message]
+        : null;
+    if (isAttributeMessage(message)) {
+      acc.push(message);
+    }
+    return acc;
+  }, []);
+}
+
+export function isAttributeMessage(
+  message: unknown
+): message is AttributeMessage {
+  return (
+    typeof message === "object" && message !== null && !Array.isArray(message)
+  );
+}
