@@ -1,4 +1,5 @@
 import {
+  DocumentAttributePostfixes,
   EmbeddingAttributePostfixes,
   ImageAttributesPostfixes,
   LLMAttributePostfixes,
@@ -7,12 +8,9 @@ import {
   MessageContentsAttributePostfixes,
   RerankerAttributePostfixes,
   RetrievalAttributePostfixes,
+  SemanticAttributePrefixes,
   ToolAttributePostfixes,
 } from "@arizeai/openinference-semantic-conventions";
-import {
-  DocumentAttributePostfixes,
-  SemanticAttributePrefixes,
-} from "@arizeai/openinference-semantic-conventions/src/trace/SemanticConventions";
 
 export type AttributeTool = {
   [ToolAttributePostfixes.name]?: string;
